@@ -6,6 +6,9 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S3.FS", "S3.FS\S3.FS.csproj", "{CE8306EE-DBF7-4D6F-8111-08730F7DC535}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{3BFB2D6B-9AFB-4961-B5BB-A7188444A497}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".github", ".github", "{524B70A8-AF11-4EEA-B857-855DB76DC12D}"
 EndProject
