@@ -57,7 +57,7 @@ namespace S3.FS
                 fileExtensions = distList.Distinct().ToArray();
             }
 
-            if (fileExtensions.Length == 0)
+            if (fileExtensions != null && fileExtensions.Length == 0)
                 fileExtensions = null;
 
             return fileExtensions;
@@ -118,16 +118,18 @@ namespace S3.FS
 
                 if (loadFiles)
                     foreach (var s3 in response.S3Objects)
-                        if (fileExtensions == null || fileExtensions.Contains((Path.GetExtension(s3.Key) + string.Empty).ToLower()))
-                            parent.Children.Add(new FSObject
-                            {
-                                Bucket = parent.Bucket,
-                                LastModified = s3.LastModified,
-                                Name = Path.GetFileName(s3.Key),
-                                Parent = parent,
-                                Size = s3.Size,
-                                ETag = s3.ETag
-                            });
+                        if (s3.Key != parentPath)
+                            if (fileExtensions == null || fileExtensions.Contains((Path.GetExtension(s3.Key) + string.Empty).ToLower()))
+                                parent.Children.Add(new FSObject
+                                {
+                                    Bucket = parent.Bucket,
+                                    LastModified = s3.LastModified,
+                                    Name = Path.GetFileName(s3.Key),
+                                    Parent = parent,
+                                    Size = s3.Size,
+                                    ETag = s3.ETag
+                                });
+                    
 
                 progress?.Report(parent.Children.Count);
 
