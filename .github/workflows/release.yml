@@ -22,5 +22,5 @@ jobs:
           chmod +x tsv
           ./tsv --xml-files S3.FS/S3.FS.csproj --verbose
           dotnet pack -c release -o nuget
-          #dotnet nuget push "nuget/*.nupkg" --skip-duplicate -k ${{secrets.NUGET_KEY}} -s https://api.nuget.org/v3/index.json
+          dotnet nuget push "nuget/*.nupkg" --skip-duplicate -k ${{secrets.NUGET_KEY}} -s https://api.nuget.org/v3/index.json
           
