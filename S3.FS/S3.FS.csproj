@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>8</LangVersion>
+    <Version>1.0.0.0</Version>
+    <Authors>Jason Davis</Authors>
+    <Company>jasondavis303</Company>
+    <Description>Treats S3 objects like hierarchical file system objects, with a few simple operations to manipulate the objects</Description>
+    <Copyright>jasondavis303</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/jasondavis303/S3.FS</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/jasondavis303/S3.FS.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.S3" Version="3.7.0.14" />
+  </ItemGroup>
+
+</Project>

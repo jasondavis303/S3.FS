@@ -1,0 +1,38 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31205.134
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "S3.FS", "S3.FS\S3.FS.csproj", "{CE8306EE-DBF7-4D6F-8111-08730F7DC535}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{3BFB2D6B-9AFB-4961-B5BB-A7188444A497}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".github", ".github", "{524B70A8-AF11-4EEA-B857-855DB76DC12D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{CC2161D9-C50B-460E-A97D-C2AA94A43B53}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\release.yml = .github\workflows\release.yml
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CE8306EE-DBF7-4D6F-8111-08730F7DC535}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE8306EE-DBF7-4D6F-8111-08730F7DC535}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE8306EE-DBF7-4D6F-8111-08730F7DC535}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE8306EE-DBF7-4D6F-8111-08730F7DC535}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{524B70A8-AF11-4EEA-B857-855DB76DC12D} = {3BFB2D6B-9AFB-4961-B5BB-A7188444A497}
+		{CC2161D9-C50B-460E-A97D-C2AA94A43B53} = {524B70A8-AF11-4EEA-B857-855DB76DC12D}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {2BC5D63A-3838-4300-A933-F847C68EA720}
+	EndGlobalSection
+EndGlobal

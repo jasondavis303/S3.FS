@@ -1,0 +1,358 @@
+﻿using Amazon.S3;
+using Amazon.S3.Model;
+using Amazon.S3.Transfer;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace S3.FS
+{
+    public class S3FService : IDisposable
+    {
+        public const string METADATA_MD5 = "x-amz-meta-md5chksum";
+
+        private readonly AmazonS3Client _client;
+        private readonly TransferUtility _transferUtility;
+
+        public S3FService(string serviceUrl, string awsAccessKeyId, string awsSecretAccessKey)
+        {
+            if (string.IsNullOrWhiteSpace(serviceUrl))
+                throw new ArgumentNullException(nameof(serviceUrl));
+
+            if (string.IsNullOrWhiteSpace(awsAccessKeyId))
+                throw new ArgumentNullException(nameof(awsAccessKeyId));
+
+            if (string.IsNullOrWhiteSpace(awsSecretAccessKey))
+                throw new ArgumentNullException(nameof(awsSecretAccessKey));
+
+            _client = new AmazonS3Client(awsAccessKeyId, awsSecretAccessKey, new AmazonS3Config { ServiceURL = serviceUrl });
+            _transferUtility = new TransferUtility(_client);
+        }
+
+        public void Dispose()
+        {
+            _client.Dispose();
+            _transferUtility.Dispose();
+        }
+
+        private string[] CheckFileExtensions(string[] fileExtensions)
+        {
+            if (fileExtensions != null)
+            {
+                var distList = new List<string>(fileExtensions);
+                for (int i = 0; i < distList.Count; i++)
+                {
+                    if (!string.IsNullOrWhiteSpace(distList[i]))
+                    {
+                        distList[i] = distList[i].Trim('*');
+                        if (!distList[i].StartsWith("."))
+                            distList[i] = '.' + distList[i];
+                        distList[i] = distList[i].ToLower();
+                    }
+                }
+                fileExtensions = distList.Distinct().ToArray();
+            }
+
+            if (fileExtensions.Length == 0)
+                fileExtensions = null;
+
+            return fileExtensions;
+        }
+
+
+
+
+        public async Task<List<FSObject>> GetBuckets(CancellationToken cancellationToken = default)
+        {
+            var response = await _client.ListBucketsAsync(cancellationToken).ConfigureAwait(false);
+            var ret = response.Buckets
+                .Select(_ => new FSObject
+                {
+                    Bucket = _.BucketName,
+                    IsBucket = true,
+                    Name = _.BucketName
+                }).ToList();
+
+            ret.Sort();
+            return ret;
+        }
+
+        /// <summary>
+        /// Loads children of the current object
+        /// </summary>
+        /// <param name="fileExtensions">If null, loads all files</param>
+        public async Task LoadChildrenAsync(FSObject parent, bool loadFolders = true, bool loadFiles = true, string[] fileExtensions = null, IProgress<int> progress = null, CancellationToken cancellationToken = default)
+        {
+            if (parent == null)
+                throw new ArgumentNullException(nameof(parent));
+
+            if (!(parent.IsFolder || parent.IsBucket))
+                return;
+
+            fileExtensions = CheckFileExtensions(fileExtensions);
+
+            parent.Children.Clear();
+
+            string parentPath = parent.Key;
+            if (parentPath != null && !parentPath.EndsWith("/"))
+                parentPath += "/";
+
+            var request = new ListObjectsV2Request { BucketName = parent.Bucket, Prefix = parentPath, Delimiter = "/" };
+            ListObjectsV2Response response;
+            do
+            {
+                response = await _client.ListObjectsV2Async(request, cancellationToken).ConfigureAwait(false);
+                if (loadFolders)
+                    foreach (string cp in response.CommonPrefixes)
+                        parent.Children.Add(new FSObject
+                        {
+                            Bucket = parent.Bucket,
+                            IsFolder = true,
+                            Name = Path.GetFileName(cp.TrimEnd('/')),
+                            Parent = parent
+                        });
+
+                if (loadFiles)
+                    foreach (var s3 in response.S3Objects)
+                        if (fileExtensions == null || fileExtensions.Contains((Path.GetExtension(s3.Key) + string.Empty).ToLower()))
+                            parent.Children.Add(new FSObject
+                            {
+                                Bucket = parent.Bucket,
+                                LastModified = s3.LastModified,
+                                Name = Path.GetFileName(s3.Key),
+                                Parent = parent,
+                                Size = s3.Size,
+                                ETag = s3.ETag
+                            });
+
+                progress?.Report(parent.Children.Count);
+
+                request.ContinuationToken = response.NextContinuationToken;
+            } while (response.IsTruncated);
+
+            parent.Sort();
+
+            progress?.Report(parent.Children.Count);
+        }
+
+
+        /// <summary>
+        /// Loads children of the current object
+        /// </summary>
+        /// <param name="fileExtensions">If null, loads all files</param>
+        public async Task LoadDescendandsAsync(FSObject parent, string[] fileExtensions = null, IProgress<int> progress = null, CancellationToken cancellationToken = default)
+        {
+            if (parent == null)
+                throw new ArgumentNullException(nameof(parent));
+
+            if (!(parent.IsFolder || parent.IsBucket))
+                return;
+
+            fileExtensions = CheckFileExtensions(fileExtensions);
+
+            parent.Children.Clear();
+
+            string parentPath = parent.Key;
+            if (parentPath != null && !parentPath.EndsWith("/"))
+                parentPath += "/";
+
+            int cnt = 0;
+
+            var request = new ListObjectsV2Request { BucketName = parent.Bucket, Prefix = parentPath };
+            ListObjectsV2Response response;
+            do
+            {
+                response = await _client.ListObjectsV2Async(request, cancellationToken).ConfigureAwait(false);
+
+                foreach (var s3 in response.S3Objects)
+                {
+                    string key = s3.Key.Substring(parent.Key.Length).Trim('/');
+                    string[] parts = key.Split(new char[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+                    var currentNode = parent;
+                    for (int i = 0; i < parts.Length; i++)
+                    {
+                        var nextNode = currentNode.Children.FirstOrDefault(item => item.Name == parts[i]);
+                        if (nextNode == null)
+                        {
+                            nextNode = new FSObject
+                            {
+                                Bucket = parent.Bucket,
+                                LastModified = s3.LastModified,
+                                Name = parts[i],
+                                Parent = currentNode,
+                                Size = s3.Size,
+                                IsFolder = i < parts.Length - 1 || s3.Key.EndsWith("/"),
+                                ETag = i < parts.Length - 1 || s3.Key.EndsWith("/") ? null : s3.ETag
+                            };
+
+
+                            bool add = true;
+                            if (!nextNode.IsFolder && fileExtensions != null)
+                                add = fileExtensions.Contains((Path.GetExtension(nextNode.Key) + string.Empty).ToLower());
+
+                            if (add)
+                            {
+                                currentNode.Children.Add(nextNode);
+                                cnt++;
+                            }
+                        }
+                        currentNode = nextNode;
+                    }
+                }
+
+                progress?.Report(cnt);
+
+                request.ContinuationToken = response.NextContinuationToken;
+            } while (response.IsTruncated);
+
+            parent.Sort();
+
+            progress?.Report(cnt);
+        }
+
+        public async Task<FSObject> GetObjectAsync(FSObject parent, string subKey, CancellationToken cancellationToken = default)
+        {
+            if (parent == null)
+                throw new ArgumentNullException(nameof(parent));
+
+            if (string.IsNullOrWhiteSpace(subKey))
+                throw new ArgumentNullException(nameof(subKey));
+
+            if (!(parent.IsFolder || parent.IsBucket))
+                return null;
+
+            var existing = parent.FindDescendant(subKey);
+            if (existing != null)
+                return existing;
+
+            string parentPath = parent.Key;
+            if (parentPath != null && !parentPath.EndsWith("/"))
+                parentPath += "/";
+
+            subKey = subKey.Trim('/');
+
+            var request = new GetObjectRequest
+            {
+                BucketName = parent.Bucket,
+                Key = (parentPath + subKey).Trim('/')
+            };
+
+            GetObjectResponse response = null;
+            try
+            {
+                response = await _client.GetObjectAsync(request, cancellationToken).ConfigureAwait(false);
+                if (response == null)
+                    return null;
+            }
+            catch
+            {
+                //Swallow 'not found' and return null
+                return null;
+            }
+
+            string key = response.Key.Substring(parent.Key.Length).Trim('/');
+            string[] parts = key.Split(new char[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            var currentNode = parent;
+            for (int i = 0; i < parts.Length; i++)
+            {
+                var nextNode = currentNode.Children.FirstOrDefault(item => item.Name == parts[i]);
+                if (nextNode == null)
+                {
+                    nextNode = new FSObject
+                    {
+                        Bucket = parent.Bucket,
+                        LastModified = response.LastModified,
+                        Name = parts[i],
+                        Parent = currentNode,
+                        Size = response.ContentLength,
+                        IsFolder = i < parts.Length - 1 || response.Key.EndsWith("/"),
+                        ETag = i < parts.Length - 1 || response.Key.EndsWith("/") ? null : response.ETag
+                    };
+
+                    currentNode.Children.Add(nextNode);
+                }
+                currentNode = nextNode;
+            }
+
+            return currentNode;
+        }
+
+        public async Task LoadMetaAsync(FSObject s3File, CancellationToken cancellationToken = default)
+        {
+            if (s3File == null)
+                throw new ArgumentNullException(nameof(s3File));
+
+            var result = await _client.GetObjectMetadataAsync(s3File.Bucket, s3File.Key, cancellationToken).ConfigureAwait(false);
+            s3File.Metadata.Clear();
+            foreach (string key in result.Metadata.Keys)
+                s3File.Metadata.Add(key, result.Metadata[key]);
+        }
+
+        public async Task<FSObject> UploadFileAsync(string filename, FSObject parent, Dictionary<string, string> metadata = null, bool computeMD5 = false, IProgress<OperationProgress> progress = null, CancellationToken cancellationToken = default)
+        {
+            const string OPERATION = "Uploading";
+
+            if (computeMD5)
+            {
+                if (metadata == null)
+                    metadata = new Dictionary<string, string>();
+                metadata[METADATA_MD5] = await Utilities.ComputeMD5Async(filename, progress, Utilities.DEFAULT_BUFFER_SIZE, cancellationToken).ConfigureAwait(false);
+            }
+
+            var req = new TransferUtilityUploadRequest
+            {
+                BucketName = parent.Bucket,
+                FilePath = filename,
+                Key = parent.Key + '/' + Path.GetFileName(filename)
+            };
+            if (metadata != null)
+                foreach (string key in metadata.Keys)
+                    req.Metadata.Add(key, metadata[key]);
+
+
+            if (progress != null)
+            {
+                DateTime started = DateTime.Now;
+                req.UploadProgressEvent += (object sender, UploadProgressArgs e) => progress.Report(OperationProgress.Build(OPERATION, filename, e.TotalBytes, e.TransferredBytes, started));
+            }
+
+            await _transferUtility.UploadAsync(req, cancellationToken).ConfigureAwait(false);
+
+            return await GetObjectAsync(parent, Path.GetFileName(filename), cancellationToken).ConfigureAwait(false);
+        }
+
+        public async Task DownloadFileAsync(FSObject s3File, string filename, IProgress<OperationProgress> progress = null, CancellationToken cancellationToken = default)
+        {
+            const string OPERATION = "Downloading";
+
+            if (s3File == null)
+                throw new ArgumentNullException(nameof(s3File));
+
+            if (string.IsNullOrWhiteSpace(filename))
+                throw new ArgumentNullException(nameof(filename));
+
+            Directory.CreateDirectory(Path.GetDirectoryName(filename));
+
+            var req = new TransferUtilityDownloadRequest
+            {
+                BucketName = s3File.Bucket,
+                FilePath = filename,
+                Key = s3File.Key
+            };
+
+            if (progress != null)
+            {
+                DateTime started = DateTime.Now;
+                req.WriteObjectProgressEvent += (object sender, WriteObjectProgressArgs e) => progress.Report(OperationProgress.Build(OPERATION, e.Key, e.TotalBytes, e.TransferredBytes, started));
+            }
+
+            await _transferUtility.DownloadAsync(req, cancellationToken).ConfigureAwait(false);
+        }
+
+        public Task DeleteFileAsync(FSObject s3File, CancellationToken cancellationToken = default) => _client.DeleteObjectAsync(s3File.Bucket, s3File.Key, cancellationToken);
+    }
+}
