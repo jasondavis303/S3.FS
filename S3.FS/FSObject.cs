@@ -6,8 +6,6 @@ namespace S3.FS
 {
     public class FSObject : IComparable
     {
-        public const string METADATA_MD5 = "x-amz-meta-md5chksum";
-
         public string Name { get; set; }
         public FSObject Parent { get; set; }
         public bool IsFolder { get; set; }
