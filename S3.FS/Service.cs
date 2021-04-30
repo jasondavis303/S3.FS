@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -356,5 +355,32 @@ namespace S3.FS
         }
 
         public Task DeleteFileAsync(FSObject s3File, CancellationToken cancellationToken = default) => _client.DeleteObjectAsync(s3File.Bucket, s3File.Key, cancellationToken);
+
+        public string GetPreSignedURL(FSObject s3File) => GetPreSignedURL(s3File, DateTime.MaxValue);
+
+        public string GetPreSignedURL(FSObject s3File, DateTime expires)
+        {
+            if (s3File == null)
+                throw new ArgumentNullException(nameof(s3File));
+
+            if (s3File.IsBucket || s3File.IsFolder)
+                throw new Exception($"{nameof(s3File)} is not a file");
+
+            var expiryUrlRequest = new GetPreSignedUrlRequest
+            {
+                BucketName = s3File.Bucket,
+                Key = s3File.Key,
+                Expires = expires
+            };
+
+            return _client.GetPreSignedURL(expiryUrlRequest);
+        }
+
+        public string GetPublicURL(FSObject s3File)
+        {
+            string ret = GetPreSignedURL(s3File);
+            ret = ret.Substring(0, ret.IndexOf("?"));
+            return ret;
+        }
     }
 }
