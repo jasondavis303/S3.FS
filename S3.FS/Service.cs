@@ -301,7 +301,7 @@ namespace S3.FS
             {
                 if (metadata == null)
                     metadata = new Dictionary<string, string>();
-                metadata[METADATA_MD5] = await Utilities.ComputeMD5Async(filename, progress, Utilities.DEFAULT_BUFFER_SIZE, cancellationToken).ConfigureAwait(false);
+                metadata[METADATA_MD5] = await Utilities.ComputeMD5Async(filename, progress, cancellationToken).ConfigureAwait(false);
             }
 
             var req = new TransferUtilityUploadRequest

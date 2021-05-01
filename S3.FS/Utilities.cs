@@ -8,12 +8,7 @@ namespace S3.FS
 {
     static class Utilities
     {
-        /// <summary>
-        /// 1 Megabyte
-        /// </summary>
-        public const int DEFAULT_BUFFER_SIZE = 1024 * 1024;
-
-        public static async Task<string> ComputeMD5Async(string filename, IProgress<OperationProgress> progress = null, int bufferSize = DEFAULT_BUFFER_SIZE, CancellationToken cancellationToken = default)
+        public static async Task<string> ComputeMD5Async(string filename, IProgress<OperationProgress> progress = null, CancellationToken cancellationToken = default)
         {
             const string OPERATION = "Computing MD5";
 
