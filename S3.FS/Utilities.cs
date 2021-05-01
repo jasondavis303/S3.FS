@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Security.Cryptography;
-using System.Text;
+﻿using Krypto.WonderDog;
+using Krypto.WonderDog.Hashers;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -19,29 +17,12 @@ namespace S3.FS
         {
             const string OPERATION = "Computing MD5";
 
-            long totalSize = new FileInfo(filename).Length;
-            long totalRead = 0;
-            DateTime started = DateTime.Now;
+            IProgress<KryptoProgress> kprog = new Progress<KryptoProgress>(kp => progress?.Report(OperationProgress.Build(OPERATION, filename, kp)));
 
-            progress?.Report(OperationProgress.Build(OPERATION, filename, totalSize, 0, started));
-
-            using FileStream fs = new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.Read, DEFAULT_BUFFER_SIZE, true);
-            using MD5 md5 = MD5.Create();
-            byte[] buffer = new byte[DEFAULT_BUFFER_SIZE];
-            int bytesRead;
-            do
-            {
-                bytesRead = await fs.ReadAsync(buffer, 0, DEFAULT_BUFFER_SIZE, cancellationToken).ConfigureAwait(false);
-                if (bytesRead > 0)
-                    md5.TransformBlock(buffer, 0, bytesRead, null, 0);
-                totalRead += bytesRead;
-                progress?.Report(OperationProgress.Build(OPERATION, filename, totalSize, totalRead, started));
-            } while (bytesRead > 0);
-            md5.TransformFinalBlock(buffer, 0, 0);
-
-            progress?.Report(OperationProgress.Build(OPERATION, filename, totalSize, totalSize, started));
-
-            return Convert.ToBase64String(md5.Hash);
+            var hasher = HasherFactory.CreateMD5();
+            var hash = await hasher.HashFileAsync(filename, kprog, cancellationToken).ConfigureAwait(false);
+            return Convert.ToBase64String(hash);
         }
+
     }
 }

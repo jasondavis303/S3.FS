@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Krypto.WonderDog;
+using System;
 
 namespace S3.FS
 {
@@ -15,6 +16,17 @@ namespace S3.FS
         public string Speed { get; internal set; }
         public double Percent { get; internal set; }
 
+        internal static OperationProgress Build(string op, string file, KryptoProgress prog) =>
+            new OperationProgress
+            {
+                Operation = op,
+                File = file,
+                Size = prog.TotalBytes,
+                Complete = prog.BytesComplete,
+                Percent = prog.TotalBytes <= 0 ? 0 : prog.BytesComplete / (double)prog.TotalBytes,
+                Speed = prog.Speed
+            };
+        
         internal static OperationProgress Build(string op, string file, long size, long complete, DateTime started)
         {
             var ret = new OperationProgress
