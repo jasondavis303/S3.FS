@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>net472;netstandard2.1</TargetFrameworks>
@@ -13,6 +13,7 @@
     <RepositoryUrl>https://github.com/jasondavis303/S3.FS.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
+
 
   <ItemGroup>
     <PackageReference Include="AWSSDK.S3" Version="3.7.0.14" />
