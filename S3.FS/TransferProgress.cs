@@ -3,11 +3,11 @@ using System;
 
 namespace S3.FS
 {
-    public class OperationProgress
+    public class TransferProgress
     {
         private const string ZERO_SPEED = "0 b/s";
 
-        private OperationProgress() { }
+        private TransferProgress() { }
 
         public string Operation { get; internal set; }
         public string File { get; internal set; }
@@ -17,8 +17,8 @@ namespace S3.FS
         public double Percent { get; internal set; }
         public bool Done { get; internal set; }
 
-        internal static OperationProgress Build(string op, string file, KryptoProgress prog) =>
-            new OperationProgress
+        internal static TransferProgress Build(string op, string file, KryptoProgress prog) =>
+            new TransferProgress
             {
                 Operation = op,
                 File = file,
@@ -29,9 +29,9 @@ namespace S3.FS
                 Done = prog.Done
             };
         
-        internal static OperationProgress Build(string op, string file, long size, long complete, DateTime started, bool done)
+        internal static TransferProgress Build(string op, string file, long size, long complete, DateTime started, bool done)
         {
-            var ret = new OperationProgress
+            var ret = new TransferProgress
             {
                 Operation = op,
                 File = file,

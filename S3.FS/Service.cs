@@ -84,7 +84,7 @@ namespace S3.FS
         /// Loads children of the current object
         /// </summary>
         /// <param name="fileExtensions">If null, loads all files</param>
-        public async Task LoadChildrenAsync(FSObject parent, bool loadFolders = true, bool loadFiles = true, string[] fileExtensions = null, IProgress<int> progress = null, CancellationToken cancellationToken = default)
+        public async Task LoadChildrenAsync(FSObject parent, bool loadFolders = true, bool loadFiles = true, string[] fileExtensions = null, IProgress<LoadProgress> progress = null, CancellationToken cancellationToken = default)
         {
             if (parent == null)
                 throw new ArgumentNullException(nameof(parent));
@@ -130,14 +130,14 @@ namespace S3.FS
                                 });
                     
 
-                progress?.Report(parent.Children.Count);
+                progress?.Report(new LoadProgress(parent.Children.Count));
 
                 request.ContinuationToken = response.NextContinuationToken;
             } while (response.IsTruncated);
 
             parent.Sort();
 
-            progress?.Report(parent.Children.Count);
+            progress?.Report(new LoadProgress(parent.Children.Count, true));
         }
 
 
@@ -145,7 +145,7 @@ namespace S3.FS
         /// Loads children of the current object
         /// </summary>
         /// <param name="fileExtensions">If null, loads all files</param>
-        public async Task LoadDescendandsAsync(FSObject parent, string[] fileExtensions = null, IProgress<int> progress = null, CancellationToken cancellationToken = default)
+        public async Task LoadDescendandsAsync(FSObject parent, string[] fileExtensions = null, IProgress<LoadProgress> progress = null, CancellationToken cancellationToken = default)
         {
             if (parent == null)
                 throw new ArgumentNullException(nameof(parent));
@@ -205,14 +205,14 @@ namespace S3.FS
                     }
                 }
 
-                progress?.Report(cnt);
+                progress?.Report(new LoadProgress(cnt));
 
                 request.ContinuationToken = response.NextContinuationToken;
             } while (response.IsTruncated);
 
             parent.Sort();
 
-            progress?.Report(cnt);
+            progress?.Report(new LoadProgress(cnt, true));
         }
 
         public async Task<FSObject> GetObjectAsync(FSObject parent, string subKey, CancellationToken cancellationToken = default)
@@ -293,7 +293,7 @@ namespace S3.FS
                 s3File.Metadata.Add(key, result.Metadata[key]);
         }
 
-        public async Task<FSObject> UploadFileAsync(string filename, FSObject parent, Dictionary<string, string> metadata = null, bool computeMD5 = false, IProgress<OperationProgress> progress = null, CancellationToken cancellationToken = default)
+        public async Task<FSObject> UploadFileAsync(string filename, FSObject parent, Dictionary<string, string> metadata = null, bool computeMD5 = false, IProgress<TransferProgress> progress = null, CancellationToken cancellationToken = default)
         {
             const string OPERATION = "Uploading";
 
@@ -315,20 +315,20 @@ namespace S3.FS
                     req.Metadata.Add(key, metadata[key]);
 
             DateTime started = DateTime.Now;
-            req.UploadProgressEvent += (object sender, UploadProgressArgs e) => progress?.Report(OperationProgress.Build(OPERATION, filename, e.TotalBytes, e.TransferredBytes, started, false));
+            req.UploadProgressEvent += (object sender, UploadProgressArgs e) => progress?.Report(TransferProgress.Build(OPERATION, filename, e.TotalBytes, e.TransferredBytes, started, false));
             
             await _transferUtility.UploadAsync(req, cancellationToken).ConfigureAwait(false);
 
             if (progress != null)
             {
                 var size = new FileInfo(filename).Length;
-                progress.Report(OperationProgress.Build(OPERATION, filename, size, size, started, true));
+                progress.Report(TransferProgress.Build(OPERATION, filename, size, size, started, true));
             }
 
             return await GetObjectAsync(parent, Path.GetFileName(filename), cancellationToken).ConfigureAwait(false);
         }
 
-        public async Task DownloadFileAsync(FSObject s3File, string filename, IProgress<OperationProgress> progress = null, CancellationToken cancellationToken = default)
+        public async Task DownloadFileAsync(FSObject s3File, string filename, IProgress<TransferProgress> progress = null, CancellationToken cancellationToken = default)
         {
             const string OPERATION = "Downloading";
 
@@ -348,14 +348,14 @@ namespace S3.FS
             };
 
             DateTime started = DateTime.Now;
-            req.WriteObjectProgressEvent += (object sender, WriteObjectProgressArgs e) => progress?.Report(OperationProgress.Build(OPERATION, e.Key, e.TotalBytes, e.TransferredBytes, started, false));
+            req.WriteObjectProgressEvent += (object sender, WriteObjectProgressArgs e) => progress?.Report(TransferProgress.Build(OPERATION, e.Key, e.TotalBytes, e.TransferredBytes, started, false));
 
             await _transferUtility.DownloadAsync(req, cancellationToken).ConfigureAwait(false);
 
             if (progress != null)
             {
                 var size = new FileInfo(filename).Length;
-                progress.Report(OperationProgress.Build(OPERATION, s3File.Key, size, size, started, true));
+                progress.Report(TransferProgress.Build(OPERATION, s3File.Key, size, size, started, true));
             }
         }
 
