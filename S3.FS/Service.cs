@@ -314,14 +314,16 @@ namespace S3.FS
                 foreach (string key in metadata.Keys)
                     req.Metadata.Add(key, metadata[key]);
 
+            DateTime started = DateTime.Now;
+            req.UploadProgressEvent += (object sender, UploadProgressArgs e) => progress?.Report(OperationProgress.Build(OPERATION, filename, e.TotalBytes, e.TransferredBytes, started, false));
+            
+            await _transferUtility.UploadAsync(req, cancellationToken).ConfigureAwait(false);
 
             if (progress != null)
             {
-                DateTime started = DateTime.Now;
-                req.UploadProgressEvent += (object sender, UploadProgressArgs e) => progress.Report(OperationProgress.Build(OPERATION, filename, e.TotalBytes, e.TransferredBytes, started));
+                var size = new FileInfo(filename).Length;
+                progress.Report(OperationProgress.Build(OPERATION, filename, size, size, started, true));
             }
-
-            await _transferUtility.UploadAsync(req, cancellationToken).ConfigureAwait(false);
 
             return await GetObjectAsync(parent, Path.GetFileName(filename), cancellationToken).ConfigureAwait(false);
         }
@@ -345,13 +347,16 @@ namespace S3.FS
                 Key = s3File.Key
             };
 
-            if (progress != null)
-            {
-                DateTime started = DateTime.Now;
-                req.WriteObjectProgressEvent += (object sender, WriteObjectProgressArgs e) => progress.Report(OperationProgress.Build(OPERATION, e.Key, e.TotalBytes, e.TransferredBytes, started));
-            }
+            DateTime started = DateTime.Now;
+            req.WriteObjectProgressEvent += (object sender, WriteObjectProgressArgs e) => progress?.Report(OperationProgress.Build(OPERATION, e.Key, e.TotalBytes, e.TransferredBytes, started, false));
 
             await _transferUtility.DownloadAsync(req, cancellationToken).ConfigureAwait(false);
+
+            if (progress != null)
+            {
+                var size = new FileInfo(filename).Length;
+                progress.Report(OperationProgress.Build(OPERATION, s3File.Key, size, size, started, true));
+            }
         }
 
         public Task DeleteFileAsync(FSObject s3File, CancellationToken cancellationToken = default) => _client.DeleteObjectAsync(s3File.Bucket, s3File.Key, cancellationToken);

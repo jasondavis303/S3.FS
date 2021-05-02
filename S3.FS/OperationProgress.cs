@@ -15,6 +15,7 @@ namespace S3.FS
         public long Complete { get; internal set; }
         public string Speed { get; internal set; }
         public double Percent { get; internal set; }
+        public bool Done { get; internal set; }
 
         internal static OperationProgress Build(string op, string file, KryptoProgress prog) =>
             new OperationProgress
@@ -24,10 +25,11 @@ namespace S3.FS
                 Size = prog.TotalBytes,
                 Complete = prog.BytesComplete,
                 Percent = prog.TotalBytes <= 0 ? 0 : prog.BytesComplete / (double)prog.TotalBytes,
-                Speed = prog.Speed
+                Speed = prog.Speed,
+                Done = prog.Done
             };
         
-        internal static OperationProgress Build(string op, string file, long size, long complete, DateTime started)
+        internal static OperationProgress Build(string op, string file, long size, long complete, DateTime started, bool done)
         {
             var ret = new OperationProgress
             {
@@ -36,7 +38,8 @@ namespace S3.FS
                 Size = size,
                 Complete = complete,
                 Percent = size <= 0 ? 0 : complete / (double)size,
-                Speed = ZERO_SPEED
+                Speed = ZERO_SPEED,
+                Done = done
             };
 
             try
