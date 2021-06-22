@@ -97,7 +97,7 @@ namespace S3.FS
             parent.Children.Clear();
 
             string parentPath = parent.Key;
-            if (parentPath != null && !parentPath.EndsWith("/"))
+            if (!string.IsNullOrEmpty(parentPath) && !parentPath.EndsWith("/"))
                 parentPath += "/";
 
             var request = new ListObjectsV2Request { BucketName = parent.Bucket, Prefix = parentPath, Delimiter = "/" };
