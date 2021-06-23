@@ -22,6 +22,10 @@ namespace S3.FS
 
         public string Key => IsBucket ? string.Empty : Parent.IsBucket ? Name : $"{Parent.Key}/{Name}";
 
+        public IEnumerable<FSObject> Folders => Children.Where(item => item.IsFolder);
+
+        public IEnumerable<FSObject> Files => Children.Where(item => !item.IsFolder);
+
         public void Sort()
         {
             Children.Sort();
