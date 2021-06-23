@@ -16,6 +16,7 @@ namespace S3.FS
         public bool IsBucket { get; set; }
         public string ETag { get; set; }
         public Dictionary<string, string> Metadata { get; } = new Dictionary<string, string>();
+        public object Data { get; set; }
 
         public string Path => IsBucket ? FormattedBucket : $"{Parent.Path}/{Name}";
 
