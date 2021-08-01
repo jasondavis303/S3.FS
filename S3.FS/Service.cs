@@ -142,10 +142,10 @@ namespace S3.FS
 
 
         /// <summary>
-        /// Loads children of the current object
+        /// Loads all descendants of the current object
         /// </summary>
         /// <param name="fileExtensions">If null, loads all files</param>
-        public async Task LoadDescendandsAsync(FSObject parent, string[] fileExtensions = null, IProgress<LoadProgress> progress = null, CancellationToken cancellationToken = default)
+        public async Task LoadDescendantsAsync(FSObject parent, string[] fileExtensions = null, IProgress<LoadProgress> progress = null, CancellationToken cancellationToken = default)
         {
             if (parent == null)
                 throw new ArgumentNullException(nameof(parent));
@@ -160,6 +160,8 @@ namespace S3.FS
             string parentPath = parent.Key;
             if (parentPath != null && !parentPath.EndsWith("/"))
                 parentPath += "/";
+            if (parent.IsBucket)
+                parentPath = null;
 
             int cnt = 0;
 
