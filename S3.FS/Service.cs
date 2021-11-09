@@ -128,7 +128,7 @@ namespace S3.FS
                                     Size = s3.Size,
                                     ETag = s3.ETag
                                 });
-                    
+
 
                 progress?.Report(new LoadProgress(parent.Children.Count));
 
@@ -318,7 +318,7 @@ namespace S3.FS
 
             DateTime started = DateTime.Now;
             req.UploadProgressEvent += (object sender, UploadProgressArgs e) => progress?.Report(TransferProgress.Build(OPERATION, filename, e.TotalBytes, e.TransferredBytes, started, false));
-            
+
             await _transferUtility.UploadAsync(req, cancellationToken).ConfigureAwait(false);
 
             if (progress != null)
@@ -361,7 +361,11 @@ namespace S3.FS
             }
         }
 
-        public Task DeleteFileAsync(FSObject s3File, CancellationToken cancellationToken = default) => _client.DeleteObjectAsync(s3File.Bucket, s3File.Key, cancellationToken);
+        public async Task DeleteFileAsync(FSObject s3File, CancellationToken cancellationToken = default)
+        {
+            await _client.DeleteObjectAsync(s3File.Bucket, s3File.Key, cancellationToken);
+            s3File.Parent.Children.Remove(s3File);
+        }
 
         public string GetPreSignedURL(FSObject s3File) => GetPreSignedURL(s3File, DateTime.MaxValue);
 
