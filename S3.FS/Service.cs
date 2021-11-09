@@ -318,7 +318,7 @@ namespace S3.FS
             {
                 BucketName = parent.Bucket,
                 FilePath = filename,
-                Key = parent.Key + '/' + newFilename
+                Key = parent.IsBucket ? newFilename : parent.Key + '/' + newFilename
             };
             if (metadata != null)
                 foreach (string key in metadata.Keys)
