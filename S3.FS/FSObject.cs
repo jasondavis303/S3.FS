@@ -16,6 +16,11 @@ namespace S3.FS
         public bool IsBucket { get; set; }
         public string ETag { get; set; }
         public Dictionary<string, string> Metadata { get; } = new Dictionary<string, string>();
+        
+        
+        /// <summary>
+        /// Memory only object to hold extra data associated with this object. It is not persisted anywhere, only exists for convenience.
+        /// </summary>
         public object Data { get; set; }
 
         public string Path => IsBucket ? FormattedBucket : $"{Parent.Path}/{Name}";
