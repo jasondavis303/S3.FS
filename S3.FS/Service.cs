@@ -295,7 +295,12 @@ namespace S3.FS
                 s3File.Metadata.Add(key, result.Metadata[key]);
         }
 
-        public async Task<FSObject> UploadFileAsync(string filename, FSObject parent, Dictionary<string, string> metadata = null, bool computeMD5 = false, IProgress<TransferProgress> progress = null, CancellationToken cancellationToken = default)
+        public Task<FSObject> UploadFileAsync(string filename, FSObject parent, Dictionary<string, string> metadata = null, bool computeMD5 = false, IProgress<TransferProgress> progress = null, CancellationToken cancellationToken = default)
+        {
+            return UploadFileAsync(filename, parent, Path.GetFileName(filename), metadata, computeMD5, progress, cancellationToken);
+        }
+
+        public async Task<FSObject> UploadFileAsync(string filename, FSObject parent, string newFilename, Dictionary<string, string> metadata = null, bool computeMD5 = false, IProgress<TransferProgress> progress = null, CancellationToken cancellationToken = default)
         {
             const string OPERATION = "Uploading";
 
@@ -310,7 +315,7 @@ namespace S3.FS
             {
                 BucketName = parent.Bucket,
                 FilePath = filename,
-                Key = parent.Key + '/' + Path.GetFileName(filename)
+                Key = parent.Key + '/' + newFilename
             };
             if (metadata != null)
                 foreach (string key in metadata.Keys)
@@ -333,7 +338,7 @@ namespace S3.FS
 
             return ret;
         }
-
+        
         public async Task DownloadFileAsync(FSObject s3File, string filename, IProgress<TransferProgress> progress = null, CancellationToken cancellationToken = default)
         {
             const string OPERATION = "Downloading";
