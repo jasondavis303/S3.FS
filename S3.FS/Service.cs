@@ -376,6 +376,20 @@ namespace S3.FS
             s3File.Parent.Children.Remove(s3File);
         }
 
+        public async Task<FSObject> CopyFileAsync(FSObject src, FSObject dstParent, string dstName, CancellationToken cancellationToken = default)
+        {
+            var response = await _client.CopyObjectAsync(src.Bucket, src.Key, dstParent.Bucket, $"{dstParent.Key}/{dstName}", cancellationToken).ConfigureAwait(false);
+            dstParent.Children.RemoveAll(item => item.Name == dstName);
+            return await GetObjectAsync(dstParent, dstName, cancellationToken).ConfigureAwait(false);
+        }
+
+        public async Task<FSObject> MoveFileAsync(FSObject src, FSObject dstParent, string dstName, CancellationToken cancellationToken = default)
+        {
+            var ret = await CopyFileAsync(src, dstParent, dstName, cancellationToken).ConfigureAwait(false);
+            await DeleteFileAsync(src, cancellationToken).ConfigureAwait(false);
+            return ret;
+        }
+
         public string GetPreSignedURL(FSObject s3File) => GetPreSignedURL(s3File, DateTime.MaxValue);
 
         public string GetPreSignedURL(FSObject s3File, DateTime expires)
