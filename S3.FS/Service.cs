@@ -327,7 +327,11 @@ namespace S3.FS
                 progress.Report(TransferProgress.Build(OPERATION, filename, size, size, started, true));
             }
 
-            return await GetObjectAsync(parent, Path.GetFileName(filename), cancellationToken).ConfigureAwait(false);
+            var ret = await GetObjectAsync(parent, Path.GetFileName(filename), cancellationToken).ConfigureAwait(false);
+            if (metadata != null)
+                await LoadMetaAsync(ret, cancellationToken).ConfigureAwait(false);
+
+            return ret;
         }
 
         public async Task DownloadFileAsync(FSObject s3File, string filename, IProgress<TransferProgress> progress = null, CancellationToken cancellationToken = default)
