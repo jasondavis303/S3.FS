@@ -312,6 +312,31 @@ namespace S3.FS
                 if (metadata == null)
                     metadata = new Dictionary<string, string>();
                 metadata[METADATA_MD5] = await Utilities.ComputeMD5Async(filename, progress, cancellationToken).ConfigureAwait(false);
+
+                try
+                {
+                    progress?.Report(TransferProgress.Build("Checking for existing file", filename, 0, 0, DateTime.Now, false));
+                    var existingFile = parent.Files.FirstOrDefault(item => item.Name == newFilename);
+                    if (existingFile == null)
+                        try { existingFile = await GetObjectAsync(parent, newFilename, cancellationToken).ConfigureAwait(false); }
+                        catch { }
+
+                    if(existingFile != null)
+                    {
+                        if(existingFile.Size == new FileInfo(filename).Length)
+                        {
+                            if(!existingFile.Metadata.TryGetValue(METADATA_MD5, out string existingMD5))
+                                await LoadMetaAsync(existingFile, cancellationToken).ConfigureAwait(false);
+                            if (existingFile.Metadata.TryGetValue(METADATA_MD5, out existingMD5))
+                                if(existingMD5 == metadata[METADATA_MD5])
+                                {
+                                    progress?.Report(TransferProgress.Build(OPERATION, filename, existingFile.Size, existingFile.Size, DateTime.Now, true));
+                                    return existingFile;
+                                }
+                        }
+                    }
+                }
+                catch { }
             }
 
             var req = new TransferUtilityUploadRequest
