@@ -28,6 +28,9 @@ namespace S3.FS
             if (string.IsNullOrWhiteSpace(awsSecretAccessKey))
                 throw new ArgumentNullException(nameof(awsSecretAccessKey));
 
+            if (!serviceUrl.ToLower().StartsWith("http://") && !serviceUrl.ToLower().StartsWith("https://"))
+                serviceUrl = "https://" + serviceUrl;
+
             _client = new AmazonS3Client(awsAccessKeyId, awsSecretAccessKey, new AmazonS3Config { ServiceURL = serviceUrl });
             _transferUtility = new TransferUtility(_client);
         }
@@ -332,6 +335,7 @@ namespace S3.FS
                 progress.Report(TransferProgress.Build(OPERATION, filename, size, size, started, true));
             }
 
+            parent.Children.RemoveAll(item => !item.IsFolder && item.Name == newFilename);
             var ret = await GetObjectAsync(parent, Path.GetFileName(filename), cancellationToken).ConfigureAwait(false);
             if (metadata != null)
                 await LoadMetaAsync(ret, cancellationToken).ConfigureAwait(false);
