@@ -220,7 +220,7 @@ namespace S3.FS
             progress?.Report(new LoadProgress(cnt, true));
         }
 
-        public async Task<FSObject> GetObjectAsync(FSObject parent, string subKey, CancellationToken cancellationToken = default)
+        public async Task<FSObject> GetObjectAsync(FSObject parent, string subKey, bool loadMetadata = false, CancellationToken cancellationToken = default)
         {
             if (parent == null)
                 throw new ArgumentNullException(nameof(parent));
@@ -284,6 +284,9 @@ namespace S3.FS
                 currentNode = nextNode;
             }
 
+            if (loadMetadata)
+                await LoadMetaAsync(currentNode, cancellationToken).ConfigureAwait(false);
+
             return currentNode;
         }
 
@@ -322,7 +325,7 @@ namespace S3.FS
                     progress?.Report(TransferProgress.Build("Checking for existing file", filename, fileSize, 0, started, false));
                     var existingFile = parent.Files.FirstOrDefault(item => item.Name == newFilename);
                     if (existingFile == null)
-                        try { existingFile = await GetObjectAsync(parent, newFilename, cancellationToken).ConfigureAwait(false); }
+                        try { existingFile = await GetObjectAsync(parent, newFilename, false, cancellationToken).ConfigureAwait(false); }
                         catch { }
 
                     if(existingFile != null)
@@ -364,10 +367,8 @@ namespace S3.FS
             }
 
             parent.Children.RemoveAll(item => !item.IsFolder && item.Name == newFilename);
-            var ret = await GetObjectAsync(parent, Path.GetFileName(filename), cancellationToken).ConfigureAwait(false);
-            if (metadata != null)
-                await LoadMetaAsync(ret, cancellationToken).ConfigureAwait(false);
-
+            var ret = await GetObjectAsync(parent, Path.GetFileName(filename), metadata != null, cancellationToken).ConfigureAwait(false);
+            
             return ret;
         }
         
@@ -412,7 +413,7 @@ namespace S3.FS
         {
             var response = await _client.CopyObjectAsync(src.Bucket, src.Key, dstParent.Bucket, $"{dstParent.Key}/{dstName}", cancellationToken).ConfigureAwait(false);
             dstParent.Children.RemoveAll(item => item.Name == dstName);
-            return await GetObjectAsync(dstParent, dstName, cancellationToken).ConfigureAwait(false);
+            return await GetObjectAsync(dstParent, dstName, false, cancellationToken).ConfigureAwait(false);
         }
 
         public async Task<FSObject> MoveFileAsync(FSObject src, FSObject dstParent, string dstName, CancellationToken cancellationToken = default)
