@@ -17,7 +17,7 @@
 
   <ItemGroup>
     <PackageReference Include="AWSSDK.S3" Version="3.7.3.20" />
-    <PackageReference Include="Krypto.WonderDog" Version="21.6.5.1176" />
+    <PackageReference Include="Krypto.WonderDog" Version="21.11.9.1091" />
   </ItemGroup>
 
 </Project>
