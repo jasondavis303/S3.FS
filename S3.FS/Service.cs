@@ -307,6 +307,8 @@ namespace S3.FS
         {
             const string OPERATION = "Uploading";
 
+            DateTime started = DateTime.Now;
+
             if (computeMD5)
             {
                 if (metadata == null)
@@ -315,7 +317,9 @@ namespace S3.FS
 
                 try
                 {
-                    progress?.Report(TransferProgress.Build("Checking for existing file", filename, 0, 0, DateTime.Now, false));
+                    long fileSize = new FileInfo(filename).Length;
+
+                    progress?.Report(TransferProgress.Build("Checking for existing file", filename, fileSize, 0, started, false));
                     var existingFile = parent.Files.FirstOrDefault(item => item.Name == newFilename);
                     if (existingFile == null)
                         try { existingFile = await GetObjectAsync(parent, newFilename, cancellationToken).ConfigureAwait(false); }
@@ -323,14 +327,14 @@ namespace S3.FS
 
                     if(existingFile != null)
                     {
-                        if(existingFile.Size == new FileInfo(filename).Length)
+                        if(existingFile.Size == fileSize)
                         {
                             if(!existingFile.Metadata.TryGetValue(METADATA_MD5, out string existingMD5))
                                 await LoadMetaAsync(existingFile, cancellationToken).ConfigureAwait(false);
                             if (existingFile.Metadata.TryGetValue(METADATA_MD5, out existingMD5))
                                 if(existingMD5 == metadata[METADATA_MD5])
                                 {
-                                    progress?.Report(TransferProgress.Build(OPERATION, filename, existingFile.Size, existingFile.Size, DateTime.Now, true));
+                                    progress?.Report(TransferProgress.Build(OPERATION, filename, existingFile.Size, existingFile.Size, started, true));
                                     return existingFile;
                                 }
                         }
@@ -349,7 +353,6 @@ namespace S3.FS
                 foreach (string key in metadata.Keys)
                     req.Metadata.Add(key, metadata[key]);
 
-            DateTime started = DateTime.Now;
             req.UploadProgressEvent += (object sender, UploadProgressArgs e) => progress?.Report(TransferProgress.Build(OPERATION, filename, e.TotalBytes, e.TransferredBytes, started, false));
 
             await _transferUtility.UploadAsync(req, cancellationToken).ConfigureAwait(false);
