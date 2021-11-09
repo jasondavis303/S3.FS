@@ -68,7 +68,7 @@ namespace S3.FS
 
 
 
-        public async Task<List<FSObject>> GetBuckets(CancellationToken cancellationToken = default)
+        public async Task<List<FSObject>> GetBucketsAsync(CancellationToken cancellationToken = default)
         {
             var response = await _client.ListBucketsAsync(cancellationToken).ConfigureAwait(false);
             var ret = response.Buckets
