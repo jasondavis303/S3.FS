@@ -298,7 +298,62 @@ namespace S3.FS
             var result = await _client.GetObjectMetadataAsync(s3File.Bucket, s3File.Key, cancellationToken).ConfigureAwait(false);
             s3File.Metadata.Clear();
             foreach (string key in result.Metadata.Keys)
-                s3File.Metadata.Add(key, result.Metadata[key]);
+                s3File.Metadata[key] = result.Metadata[key];
+        }
+
+        public async Task SetMetadataAsync(FSObject s3File, IDictionary<string, string> metadata, CancellationToken cancellationToken = default)
+        {
+            await LoadMetaAsync(s3File, cancellationToken).ConfigureAwait(false);
+
+            if (metadata == null)
+                metadata = new Dictionary<string, string>();
+
+            if (s3File.Metadata.Count == 0)
+                await LoadMetaAsync(s3File, cancellationToken).ConfigureAwait(false);
+
+            bool changed = false;
+            if (metadata.Count == s3File.Metadata.Count)
+            {
+                foreach (string key in metadata.Keys)
+                {
+                    if (s3File.Metadata.TryGetValue(key, out string val))
+                    {
+                        if(metadata[key] != val)
+                        {
+                            changed = true;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                //Different sized dictionaries
+                changed = true;
+            }
+
+            if(changed)
+            {
+                var copyRequest = new CopyObjectRequest
+                {
+                    SourceBucket = s3File.Bucket,
+                    SourceKey = s3File.Key,
+                    DestinationBucket = s3File.Bucket,
+                    DestinationKey = s3File.Key,
+                    MetadataDirective = S3MetadataDirective.REPLACE
+                };
+
+                foreach (string key in metadata.Keys)
+                    copyRequest.Metadata[key] = metadata[key];
+
+                await _client.CopyObjectAsync(copyRequest, cancellationToken).ConfigureAwait(false);
+                await GetObjectAsync(s3File.Parent, s3File.Name, true, cancellationToken).ConfigureAwait(false);
+            }
         }
 
         public Task<FSObject> UploadFileAsync(string filename, FSObject parent, Dictionary<string, string> metadata = null, bool computeMD5 = false, IProgress<TransferProgress> progress = null, CancellationToken cancellationToken = default)
@@ -411,7 +466,16 @@ namespace S3.FS
 
         public async Task<FSObject> CopyFileAsync(FSObject src, FSObject dstParent, string dstName, CancellationToken cancellationToken = default)
         {
-            var response = await _client.CopyObjectAsync(src.Bucket, src.Key, dstParent.Bucket, $"{dstParent.Key}/{dstName}", cancellationToken).ConfigureAwait(false);
+            //var response = await _client.CopyObjectAsync(src.Bucket, src.Key, dstParent.Bucket, $"{dstParent.Key}/{dstName}", cancellationToken).ConfigureAwait(false);
+            var request = new CopyObjectRequest
+            {
+                SourceBucket = src.Bucket,
+                SourceKey = src.Key,
+                DestinationBucket = dstParent.Bucket,
+                DestinationKey = $"{dstParent.Key}/{dstName}",
+                MetadataDirective = S3MetadataDirective.COPY
+            };
+            await _client.CopyObjectAsync(request, cancellationToken).ConfigureAwait(false);
             dstParent.Children.RemoveAll(item => item.Name == dstName);
             return await GetObjectAsync(dstParent, dstName, false, cancellationToken).ConfigureAwait(false);
         }
