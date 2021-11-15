@@ -422,7 +422,7 @@ namespace S3.FS
             }
 
             parent.Children.RemoveAll(item => !item.IsFolder && item.Name == newFilename);
-            var ret = await GetObjectAsync(parent, Path.GetFileName(filename), metadata != null, cancellationToken).ConfigureAwait(false);
+            var ret = await GetObjectAsync(parent, newFilename, metadata != null, cancellationToken).ConfigureAwait(false);
             
             return ret;
         }
