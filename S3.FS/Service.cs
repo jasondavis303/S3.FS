@@ -356,50 +356,53 @@ namespace S3.FS
             }
         }
 
-        public Task<FSObject> UploadFileAsync(string filename, FSObject parent, Dictionary<string, string> metadata = null, bool computeMD5 = false, IProgress<TransferProgress> progress = null, CancellationToken cancellationToken = default)
+        public Task<FSObject> UploadFileAsync(string filename, FSObject parent, Dictionary<string, string> metadata = null, bool computeMD5 = false, bool overwrite = false, IProgress<TransferProgress> progress = null, CancellationToken cancellationToken = default)
         {
-            return UploadFileAsync(filename, parent, Path.GetFileName(filename), metadata, computeMD5, progress, cancellationToken);
+            return UploadFileAsync(filename, parent, Path.GetFileName(filename), metadata, computeMD5, overwrite, progress, cancellationToken);
         }
 
-        public async Task<FSObject> UploadFileAsync(string filename, FSObject parent, string newFilename, Dictionary<string, string> metadata = null, bool computeMD5 = false, IProgress<TransferProgress> progress = null, CancellationToken cancellationToken = default)
+        public async Task<FSObject> UploadFileAsync(string filename, FSObject parent, string newFilename, Dictionary<string, string> metadata = null, bool computeMD5 = false, bool overwrite = false, IProgress<TransferProgress> progress = null, CancellationToken cancellationToken = default)
         {
             const string OPERATION = "Uploading";
 
             DateTime started = DateTime.Now;
+            long fileSize = new FileInfo(filename).Length;
+
 
             if (computeMD5)
             {
                 if (metadata == null)
                     metadata = new Dictionary<string, string>();
                 metadata[METADATA_MD5] = await Utilities.ComputeMD5Async(filename, progress, cancellationToken).ConfigureAwait(false);
-
-                try
-                {
-                    long fileSize = new FileInfo(filename).Length;
-
-                    progress?.Report(TransferProgress.Build("Checking for existing file", filename, fileSize, 0, started, false));
-                    var existingFile = parent.Files.FirstOrDefault(item => item.Name == newFilename);
-                    if (existingFile == null)
-                        try { existingFile = await GetObjectAsync(parent, newFilename, false, cancellationToken).ConfigureAwait(false); }
-                        catch { }
-
-                    if(existingFile != null)
-                    {
-                        if(existingFile.Size == fileSize)
-                        {
-                            if(!existingFile.Metadata.TryGetValue(METADATA_MD5, out string existingMD5))
-                                await LoadMetaAsync(existingFile, cancellationToken).ConfigureAwait(false);
-                            if (existingFile.Metadata.TryGetValue(METADATA_MD5, out existingMD5))
-                                if(existingMD5 == metadata[METADATA_MD5])
-                                {
-                                    progress?.Report(TransferProgress.Build(OPERATION, filename, existingFile.Size, existingFile.Size, started, true));
-                                    return existingFile;
-                                }
-                        }
-                    }
-                }
-                catch { }
             }
+
+            progress?.Report(TransferProgress.Build("Checking for existing file", filename, fileSize, 0, started, false));
+            var existingFile = parent.Files.FirstOrDefault(item => item.Name == newFilename);
+            if (existingFile == null)
+                try { existingFile = await GetObjectAsync(parent, newFilename, false, cancellationToken).ConfigureAwait(false); }
+                catch { }
+
+            if (existingFile != null)
+            {
+                if (existingFile.Size == fileSize)
+                {
+                    if (!existingFile.Metadata.TryGetValue(METADATA_MD5, out string existingMD5))
+                        await LoadMetaAsync(existingFile, cancellationToken).ConfigureAwait(false);
+
+                    if (existingFile.Metadata.TryGetValue(METADATA_MD5, out existingMD5))
+                        if (existingMD5 == metadata[METADATA_MD5])
+                        {
+                            progress?.Report(TransferProgress.Build(OPERATION, filename, existingFile.Size, existingFile.Size, started, true));
+                            return existingFile;
+                        }
+                }
+
+                if (!overwrite)
+                    throw new Exception("File already exists");
+
+                await DeleteFileAsync(existingFile, cancellationToken).ConfigureAwait(false);
+            }
+
 
             var req = new TransferUtilityUploadRequest
             {
@@ -423,11 +426,11 @@ namespace S3.FS
 
             parent.Children.RemoveAll(item => !item.IsFolder && item.Name == newFilename);
             var ret = await GetObjectAsync(parent, newFilename, metadata != null, cancellationToken).ConfigureAwait(false);
-            
+
             return ret;
         }
         
-        public async Task DownloadFileAsync(FSObject s3File, string filename, IProgress<TransferProgress> progress = null, CancellationToken cancellationToken = default)
+        public async Task DownloadFileAsync(FSObject s3File, string filename, bool overwrite = false, IProgress<TransferProgress> progress = null, CancellationToken cancellationToken = default)
         {
             const string OPERATION = "Downloading";
 
@@ -438,6 +441,27 @@ namespace S3.FS
                 throw new ArgumentNullException(nameof(filename));
 
             Directory.CreateDirectory(Path.GetDirectoryName(filename));
+
+            if(File.Exists(filename))
+            {
+                if (new FileInfo(filename).Length == s3File.Size)
+                {
+                    if (!s3File.Metadata.TryGetValue(METADATA_MD5, out string srcMD5))
+                        await LoadMetaAsync(s3File, cancellationToken).ConfigureAwait(false);
+
+                    if (s3File.Metadata.TryGetValue(METADATA_MD5, out srcMD5))
+                    {
+                        string localMD5 = await Utilities.ComputeMD5Async(filename, progress, cancellationToken).ConfigureAwait(false);
+                        if (localMD5 == srcMD5)
+                            return;
+                    }
+                }
+
+                if (!overwrite)
+                    throw new IOException("FIle already exists");
+
+                File.Delete(filename);
+            }    
 
             var req = new TransferUtilityDownloadRequest
             {
@@ -464,9 +488,38 @@ namespace S3.FS
             s3File.Parent.Children.Remove(s3File);
         }
 
-        public async Task<FSObject> CopyFileAsync(FSObject src, FSObject dstParent, string dstName, CancellationToken cancellationToken = default)
+        public async Task<FSObject> CopyFileAsync(FSObject src, FSObject dstParent, string dstName, bool overwrite = false, CancellationToken cancellationToken = default)
         {
-            //var response = await _client.CopyObjectAsync(src.Bucket, src.Key, dstParent.Bucket, $"{dstParent.Key}/{dstName}", cancellationToken).ConfigureAwait(false);
+            var existingFile = dstParent.Files.FirstOrDefault(item => item.Name == dstName);
+            if (existingFile == null)
+                try { existingFile = await GetObjectAsync(dstParent, dstName, false, cancellationToken).ConfigureAwait(false); }
+                catch { }
+
+            if (existingFile != null)
+            {
+                if (src.Size == existingFile.Size)
+                {
+                    if (!src.Metadata.TryGetValue(METADATA_MD5, out string srcMD5))
+                        await LoadMetaAsync(src, cancellationToken).ConfigureAwait(false);
+
+                    if (src.Metadata.TryGetValue(METADATA_MD5, out srcMD5))
+                    {
+                        if (!existingFile.Metadata.TryGetValue(METADATA_MD5, out string existingMD5))
+                            await LoadMetaAsync(existingFile, cancellationToken).ConfigureAwait(false);
+
+                        if (existingFile.Metadata.TryGetValue(METADATA_MD5, out existingMD5))
+                            if (existingMD5 == srcMD5)
+                                return existingFile;
+                    }
+                }
+
+                if (!overwrite)
+                    throw new Exception("File already exists");
+
+                await DeleteFileAsync(existingFile, cancellationToken).ConfigureAwait(false);
+            }
+
+
             var request = new CopyObjectRequest
             {
                 SourceBucket = src.Bucket,
@@ -480,9 +533,9 @@ namespace S3.FS
             return await GetObjectAsync(dstParent, dstName, false, cancellationToken).ConfigureAwait(false);
         }
 
-        public async Task<FSObject> MoveFileAsync(FSObject src, FSObject dstParent, string dstName, CancellationToken cancellationToken = default)
+        public async Task<FSObject> MoveFileAsync(FSObject src, FSObject dstParent, string dstName, bool overwrite = false, CancellationToken cancellationToken = default)
         {
-            var ret = await CopyFileAsync(src, dstParent, dstName, cancellationToken).ConfigureAwait(false);
+            var ret = await CopyFileAsync(src, dstParent, dstName, overwrite, cancellationToken).ConfigureAwait(false);
             await DeleteFileAsync(src, cancellationToken).ConfigureAwait(false);
             return ret;
         }
