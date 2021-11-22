@@ -61,6 +61,31 @@ namespace S3.FS
             return currentNode;
         }
 
+        public FSObject CreateChildFolders(string key)
+        {
+            string[] parts = key.Split(new char[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            string name = parts[0];
+
+            var child = Folders.FirstOrDefault(item => item.Name == name);
+            if(child == null)
+            {
+                child = new FSObject
+                {
+                    Bucket = Bucket,
+                    IsFolder = true,
+                    Name = name,
+                    Parent = this
+                };
+                Children.Add(child);
+            }
+
+            if (parts.Length > 1)
+                child = child.CreateChildFolders(string.Join("/", parts.Skip(1)));
+            
+            return child;            
+        }
+
+
         private string SortKey => IsBucket ? Bucket : Name;
 
         private string FormattedBucket => $"[{Bucket}]";
