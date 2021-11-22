@@ -45,7 +45,7 @@ namespace Demo
             Console.WriteLine();
 
             service = new S3FService(endpoint, accessKey, secret);
-            var buckets = await service.GetBuckets();
+            var buckets = await service.GetBucketsAsync();
             var demoBucket = buckets.FirstOrDefault(item => item.IsBucket && item.Name == bucket);
             await Print(demoBucket, 0);
         }
