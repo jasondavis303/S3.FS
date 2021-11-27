@@ -540,7 +540,7 @@ namespace S3.FS
             return ret;
         }
 
-        public string GetPreSignedURL(FSObject s3File) => GetPreSignedURL(s3File, DateTime.MaxValue);
+        public string GetPreSignedURL(FSObject s3File) => GetPreSignedURL(s3File, DateTime.Now.AddSeconds(604800));
 
         public string GetPreSignedURL(FSObject s3File, DateTime expires)
         {
